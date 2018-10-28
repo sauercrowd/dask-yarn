@@ -194,6 +194,46 @@ class YarnCluster(object):
         self._start_cluster(spec, skein_client)
         return self
 
+    @classmethod
+    def from_application_id(cls,
+            app_id,
+            skein_client=None):
+        
+                """Create a cluster from an existing specification
+
+        Parameters
+        ----------
+        app_id : str
+            The ID of the application
+        skein_client: skein.Client, optional
+            The ``skein.Client`` to use. If not provided, one will be started
+        wait : bool, optional
+            If true [default], blocks until the application starts. If False,
+            will raise a ``skein.ApplicationNotRunningError`` immediately if the application isn't running.
+
+        Raises
+        ------
+        skein.ApplicationNotRunningError
+            If the application isn't running
+        """
+        self = super(YarnCluster, cls).__new__(cls)
+
+        if skein_client is None:
+            skein_client = skein.Client()
+
+        app = skein_client.connect(app_id, wait)
+        spec = app.get_specification()
+
+        # Check if application contains a dask.worker
+        spec_dict = spec.to_dict()
+
+        # Ensure application gets cleaned up
+        self._finalizer = weakref.finalize(self, app.shutdown)
+
+        self.app_id = app.id
+        self.application_client = app
+        self.scheduler_address = scheduler_address
+
     def _start_cluster(self, spec, skein_client=None):
         """Start the cluster and initialize state"""
         if skein_client is None:
